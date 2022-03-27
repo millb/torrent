@@ -1,0 +1,32 @@
+version: "3.7"
+services:
+  seeder:
+    build: ./solution
+    image: hw2-solution
+    volumes:
+      - ./tmp/data1.bin:/data.bin
+      - ./tmp/torrent1.conf:/torrent.conf
+    restart: "no"
+    networks:
+      localnet:
+        ipv4_address: 172.31.111.42
+
+  leecher:
+    image: hw2-solution
+    volumes:
+      - ./tmp/data2.bin:/data.bin
+      - ./tmp/torrent2.conf:/torrent.conf
+    restart: "no"
+    networks:
+      localnet:
+        ipv4_address: 172.31.111.69
+
+
+networks:
+  localnet:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.31.111.0/24
+    internal: true
