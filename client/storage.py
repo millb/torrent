@@ -4,9 +4,6 @@ from typing import Optional
 
 from config import FileInfo
 
-DATA_PATH = 'data.bin'
-
-
 class FileStorage:
     def __init__(self, info: FileInfo, path: str = DATA_PATH) -> None:
         p = pathlib.Path(path)
@@ -37,7 +34,7 @@ class FileStorage:
             offset, size = self.file_config.block(block=block)
 
             if len(data) != size:
-                raise ValueError('invalid data size')
+                raise ValueError(f'invalid data size {len(data)}, {size}, {block}')
 
             try:
                 self.file.seek(offset, 0)
@@ -46,3 +43,4 @@ class FileStorage:
                 raise any_exc
 
             self.file.write(data)
+        self.file.flush()

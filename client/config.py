@@ -42,6 +42,10 @@ def read_config(config_path: str = CONFIG_PATH) -> Config:
     with open(config_path, 'r') as f:
         data = json.load(f)
 
+    if not data['FileInfo']['Parts']:
+        data['FileInfo']['Parts'] = []
+    if not data['Peers']:
+        data['Peers'] = []
     return Config(
         peers=data['Peers'],
         file_info=FileInfo(

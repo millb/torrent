@@ -1,7 +1,7 @@
 version: "3.7"
 services:
   seeder:
-    build: ./solution
+    build: ./client
     image: hw2-solution
     volumes:
       - ./tmp/data1.bin:/data.bin
