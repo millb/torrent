@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.DEBUG, format=f'[%(asctime)s][%(levelname)s][%
 app.json_encoder = ImprovedEncoder
 
 def get_peer():
-    return Peer(request.remote_addr, int(request.json['listening_port']))
+    return Peer(request.json['listening_host'], int(request.json['listening_port']))
 
 @app.route("/ready")
 def ready():

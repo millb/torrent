@@ -19,10 +19,10 @@ CONFIG_PATH = './cfg.json'
 PART_SIZE = 256
 
 def hash_to_torrent_path(torrent_dir, hash):
-    return torrent_dir + '/' + hash + '.json'
+    return torrent_dir + hash + '.json'
 
 def hash_to_file_path(file_dir, hash):
-    return file_dir + '/' + hash + '.bin'
+    return file_dir + hash + '.bin'
 
 class Manager:
     def __init__(self, cfg_path: str = CONFIG_PATH):
@@ -46,14 +46,16 @@ class Manager:
             print(hash, flush=True)
         print('**************')
 
-    async def _uploadFile(self, file_path):
+    async def _uploadFile(self, file_path, path_to_end_file):
         req_path = self.tracker_host + ':' + str(self.tracker_port) + '/hash'
-        response = requests.post(req_path, json={'listening_port': self.port})
+        response = requests.post(req_path, json={'listening_port': self.port, 'listening_host': self.host})
         json_response = response.json()
         hash = json_response['hash']
         torrent_path = await self._createTorrent(file_path, hash)
         real_file_path = self.files_dir + '/' + hash + '.bin'
         shutil.copy(file_path, real_file_path)
+        # os.makedirs(path_to_end_file, exist_ok=True)
+        shutil.copy(torrent_path, path_to_end_file)
         self.hashes.add(hash)
         print('SUCCESSFUL UPLOAD', flush=True)
 
@@ -63,7 +65,7 @@ class Manager:
             data = json.load(f)
         path = self.tracker_host + ':' + str(self.tracker_port) + '/peers'
         hash = data['FileInfo']['Hash']
-        response = requests.post(path, json={'hash': hash, 'listening_port': self.port})
+        response = requests.post(path, json={'hash': hash, 'listening_port': self.port, 'listening_host': self.host})
         data['Peers'] = response.json()
         cfg = Config(
             peers=data['Peers'],
@@ -77,6 +79,7 @@ class Manager:
         shutil.copy(torrent_path, hash_to_torrent_path(self.torrent_dir, hash))
         self.hashes.add(hash)
         await self._background_routine(cfg, hash_to_file_path(self.files_dir, hash))
+        # os.makedirs(path_to_end_file, exist_ok=True)
         shutil.copy(hash_to_file_path(self.files_dir, hash), path_to_end_file)
         print('SUCCESSFUL DOWNLOAD', flush=True)
 
@@ -126,7 +129,7 @@ class Manager:
             if command[0] == 'download':
                 await self._downloadFile(command[1], command[2])
             elif command[0] == 'upload':
-                await self._uploadFile(command[1])
+                await self._uploadFile(command[1], command[2])
 
 
     async def _background_routine(self, cfg, file_path) -> None:
@@ -135,11 +138,11 @@ class Manager:
 
         file_storage = FileStorage(cfg.file_info, file_path)
 
-#         random_parts = [(i, cfg.file_info.parts[i]) for i in range(len(cfg.file_info.parts))]
-#         random.shuffle(random_parts)
+        random_parts = [(i, cfg.file_info.parts[i]) for i in range(len(cfg.file_info.parts))]
+        random.shuffle(random_parts)
 
-#         for idx, part in random_parts:
-        for idx in range(len(cfg.file_info.parts)):
+        for idx, part in random_parts:
+#         for idx in range(len(cfg.file_info.parts)):
             print(idx)
             print(cfg.peers)
             for obj in cfg.peers['peers']:
@@ -149,7 +152,7 @@ class Manager:
 
 
     async def _request_about_node(self, peer, port, block_idx, file_storage, cfg):
-        if peer == self.host:
+        if peer == self.host and port == self.port:
             return
 
         print(f'Trying to connect to {peer}:{port}', flush=True)
