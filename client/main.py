@@ -7,6 +7,7 @@ import os.path
 import uuid
 import sys
 import shutil
+import socket
 
 from config import read_config, Config, FileInfo
 from storage import FileStorage
@@ -74,7 +75,7 @@ class Manager:
         print(f'Serving on {addrs}', flush=True)
         await asyncio.gather(
             server.serve_forever(),
-            self._listen_client()
+            self._listen_client(),
         )
 
 
@@ -104,8 +105,10 @@ class Manager:
 
 
     async def _listen_client(self):
+        loop = asyncio.get_event_loop()
         while True:
-            command = input().split()
+            cmd = await loop.run_in_executor(None, input, '')
+            command = cmd.split()
             if command[0] == 'download':
                 await self._downloadFile(command[1], command[2])
             elif command[0] == 'upload':
@@ -139,7 +142,7 @@ class Manager:
         reader, writer = await asyncio.open_connection(peer, port)
         print(f'Connect to {peer}:{port}', flush=True)
 
-        request = 'need-' + str(cfg.file_info.hash) + '-' + str(block_idx)
+        request = 'need ' + str(cfg.file_info.hash) + ' ' + str(block_idx)
         writer.write(request.encode())
         print(f'before')
         await writer.drain()
@@ -165,7 +168,8 @@ class Manager:
         request = await reader.read(256)
         req = request.decode('utf-8')
         print(f'Got {request.decode("utf-8")}', flush=True)
-        verification_word, hash, block_index = req.split('-')
+        verification_word, hash, block_index = req.split()
+        block_index = int(block_index)
         if verification_word != 'need':
             writer.close()
             return
@@ -175,6 +179,9 @@ class Manager:
             await writer.drain()
             writer.close()
             return
+        else:
+            writer.write('Go'.encode())
+            await writer.drain()
 
         cfg = read_config(self.hash_to_torrent_paths[hash])
         file_storage = FileStorage(cfg.file_info, self.hash_to_file_paths[hash])
