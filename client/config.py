@@ -42,7 +42,7 @@ def read_config(config_path: str = CONFIG_PATH) -> Config:
 
     if not data['FileInfo']['Parts']:
         data['FileInfo']['Parts'] = []
-    if not data['Peers']:
+    if 'Peers' not in data:
         data['Peers'] = []
     return Config(
         peers=data['Peers'],
