@@ -3,7 +3,6 @@ from typing import Optional
 
 from storage import FileStorage
 
-
 def calculate_hash(data: bytes) -> str:
     return hashlib.sha1(data).hexdigest()
 

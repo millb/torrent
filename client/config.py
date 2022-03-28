@@ -1,18 +1,16 @@
 import asyncio
 from dataclasses import dataclass
 import json
-from typing import Optional
-
-CONFIG_PATH = 'torrent.conf'
-
+from typing import Optional, List, Tuple
 
 @dataclass
 class FileInfo:
+    hash: str
     size: int
     part_size: int
-    parts: list[str]
+    parts: List[str]
 
-    def block(self, block: int) -> tuple[int, int]:
+    def block(self, block: int) -> Tuple[int, int]:
         """Return offset and size for given block
 
         :param block: index of block
@@ -34,10 +32,10 @@ class FileInfo:
 
 @dataclass
 class Config:
-    peers: list[str]
+    peers: List[str]
     file_info: Optional[FileInfo] = None
 
-
+CONFIG_PATH = 'torrent.conf'
 def read_config(config_path: str = CONFIG_PATH) -> Config:
     with open(config_path, 'r') as f:
         data = json.load(f)
@@ -52,17 +50,6 @@ def read_config(config_path: str = CONFIG_PATH) -> Config:
             size=data['FileInfo']['Size'],
             part_size=data['FileInfo']['PartSize'],
             parts=data['FileInfo']['Parts'],
+            hash=data['FileInfo']['Hash'],
         ),
     )
-
-
-class Provider:
-    def __init__(self, config_path: str = CONFIG_PATH) -> None:
-        self.config = read_config(config_path)
-        self.config_path = CONFIG_PATH
-
-        self.lock = asyncio.Lock()
-
-    async def get_config(self) -> Config:
-        async with self.lock:
-            return self.config

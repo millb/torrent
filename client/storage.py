@@ -4,6 +4,9 @@ from typing import Optional
 
 from config import FileInfo
 
+DATA_PATH = 'data.bin'
+
+
 class FileStorage:
     def __init__(self, info: FileInfo, path: str = DATA_PATH) -> None:
         p = pathlib.Path(path)

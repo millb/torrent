@@ -1,0 +1,11 @@
+{
+  "self": {
+    "service": "test1",
+    "host": "0.0.0.0",
+    "port": 1000
+  },
+  "tracker": {
+    "host": "http://0.0.0.0",
+    "port": 5000
+  }
+}
