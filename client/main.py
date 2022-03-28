@@ -4,6 +4,7 @@ import json
 import random
 import requests
 import os.path
+import os
 import uuid
 import sys
 import shutil
@@ -16,6 +17,12 @@ from utils import calculate_hash
 
 CONFIG_PATH = './cfg.json'
 PART_SIZE = 256
+
+def hash_to_torrent_path(torrent_dir, hash):
+    return torrent_dir + '/' + hash + '.json'
+
+def hash_to_file_path(file_dir, hash):
+    return file_dir + '/' + hash + '.bin'
 
 class Manager:
     def __init__(self, cfg_path: str = CONFIG_PATH):
@@ -31,9 +38,13 @@ class Manager:
             self.torrent_dir = self.name + '/torrents/'
             os.makedirs(self.files_dir, exist_ok=True)
             os.makedirs(self.torrent_dir, exist_ok=True)
-        # TODO: hash_to_file, hash_to_torrent -> null
-        self.hash_to_file_paths = {}
-        self.hash_to_torrent_paths = {}
+        self.hashes = set()
+        for filename in os.listdir(self.torrent_dir):
+            self.hashes.add(filename[:-5])
+        print('*** HASHES ***')
+        for hash in self.hashes:
+            print(hash, flush=True)
+        print('**************')
 
     async def _uploadFile(self, file_path):
         req_path = self.tracker_host + ':' + str(self.tracker_port) + '/hash'
@@ -43,16 +54,16 @@ class Manager:
         torrent_path = await self._createTorrent(file_path, hash)
         real_file_path = self.files_dir + '/' + hash + '.bin'
         shutil.copy(file_path, real_file_path)
-        self.hash_to_file_paths[hash] = file_path
-        self.hash_to_torrent_paths[hash] = torrent_path
+        self.hashes.add(hash)
         print('SUCCESSFUL UPLOAD', flush=True)
 
 
-    async def _downloadFile(self, torrent_path, name):
+    async def _downloadFile(self, torrent_path, path_to_end_file):
         with open(torrent_path, 'r') as f:
             data = json.load(f)
         path = self.tracker_host + ':' + str(self.tracker_port) + '/peers'
-        response = requests.post(path, json={'hash': data['FileInfo']['Hash'], 'listening_port': self.port})
+        hash = data['FileInfo']['Hash']
+        response = requests.post(path, json={'hash': hash, 'listening_port': self.port})
         data['Peers'] = response.json()
         cfg = Config(
             peers=data['Peers'],
@@ -63,7 +74,10 @@ class Manager:
                 hash=data['FileInfo']['Hash'],
             ),
         )
-        await self._background_routine(cfg, name)
+        shutil.copy(torrent_path, hash_to_torrent_path(self.torrent_dir, hash))
+        self.hashes.add(hash)
+        await self._background_routine(cfg, hash_to_file_path(self.files_dir, hash))
+        shutil.copy(hash_to_file_path(self.files_dir, hash), path_to_end_file)
         print('SUCCESSFUL DOWNLOAD', flush=True)
 
 
@@ -115,11 +129,11 @@ class Manager:
                 await self._uploadFile(command[1])
 
 
-    async def _background_routine(self, cfg, name) -> None:
+    async def _background_routine(self, cfg, file_path) -> None:
         await asyncio.sleep(5)
         print(f'ip: {self.host}', flush=True)
 
-        file_storage = FileStorage(cfg.file_info, self.files_dir + name)
+        file_storage = FileStorage(cfg.file_info, file_path)
 
 #         random_parts = [(i, cfg.file_info.parts[i]) for i in range(len(cfg.file_info.parts))]
 #         random.shuffle(random_parts)
@@ -144,12 +158,10 @@ class Manager:
 
         request = 'need ' + str(cfg.file_info.hash) + ' ' + str(block_idx)
         writer.write(request.encode())
-        print(f'before')
         await writer.drain()
-        print(f'after')
 
         resp = await reader.read(256)
-        print(f'after!after')
+
         if resp.decode('utf-8') != 'Nope':
             print(f'get from {peer}: {block_idx}', flush=True)
             result = bytes()
@@ -174,7 +186,7 @@ class Manager:
             writer.close()
             return
 
-        if hash not in self.hash_to_torrent_paths or hash not in self.hash_to_file_paths:
+        if hash not in self.hashes:
             writer.write('Nope'.encode())
             await writer.drain()
             writer.close()
@@ -183,8 +195,8 @@ class Manager:
             writer.write('Go'.encode())
             await writer.drain()
 
-        cfg = read_config(self.hash_to_torrent_paths[hash])
-        file_storage = FileStorage(cfg.file_info, self.hash_to_file_paths[hash])
+        cfg = read_config(hash_to_torrent_path(self.torrent_dir, hash))
+        file_storage = FileStorage(cfg.file_info, hash_to_file_path(self.files_dir, hash))
         block = await verify_piece(file_storage, block_index, cfg.file_info.parts[block_index])
         if not block:
             writer.close()
