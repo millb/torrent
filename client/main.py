@@ -155,6 +155,10 @@ class Manager:
         if peer == self.host and port == self.port:
             return
 
+        block = await verify_piece(file_storage, block_idx, cfg.file_info.parts[block_idx])
+        if block:
+            return
+
         print(f'Trying to connect to {peer}:{port}', flush=True)
         reader, writer = await asyncio.open_connection(peer, port)
         print(f'Connect to {peer}:{port}', flush=True)
@@ -163,9 +167,10 @@ class Manager:
         writer.write(request.encode())
         await writer.drain()
 
-        resp = await reader.read(256)
+        resp = await reader.read(8) # keyword (nononono or gogogogo)
 
-        if resp.decode('utf-8') != 'Nope':
+        print(resp.decode('ascii'))
+        if resp.decode('ascii') != 'nononono':
             print(f'get from {peer}: {block_idx}', flush=True)
             result = bytes()
             offset = 0
@@ -190,21 +195,28 @@ class Manager:
             return
 
         if hash not in self.hashes:
-            writer.write('Nope'.encode())
+            print('Nope hash')
+            writer.write('nononono'.encode('ascii'))
             await writer.drain()
             writer.close()
             return
-        else:
-            writer.write('Go'.encode())
-            await writer.drain()
 
         cfg = read_config(hash_to_torrent_path(self.torrent_dir, hash))
         file_storage = FileStorage(cfg.file_info, hash_to_file_path(self.files_dir, hash))
         block = await verify_piece(file_storage, block_index, cfg.file_info.parts[block_index])
         if not block:
+            print(' bock')
+            writer.write('nononono'.encode('ascii'))
+            await writer.drain()
             writer.close()
             return
+
+        writer.write('gogogogo'.encode('ascii'))
+        print('gogogogo')
+        await writer.drain()
+
         writer.write(block)
+        await writer.drain()
         writer.close()
 
 
